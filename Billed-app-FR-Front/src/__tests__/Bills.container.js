@@ -154,19 +154,18 @@ describe('Given I am connected as an employee', () => {
   });
 
   describe('integration tests', () => {
+    //tester que quand on passe par getBills, on a bien notre date et status formatés
+
     test('getBills returns bills with formatted date and status', async () => {
-      // 1) on crée un faux snapshot
-      const rawDocs = [
-        { id: 'a1', date: '2021-04-10', status: 'pending', foo: 'bar' },
-        { id: 'b2', date: '2022-12-01', status: 'accepted', foo: 'baz' },
-      ];
+        // 1) on crée un store factice qui renvoie les fixtures
       const fakeStore = {
         bills: () => ({
-          list: () => Promise.resolve(rawDocs),
+          list: () => Promise.resolve(billsFixtures),
         }),
       };
 
       // 2) on monte l'instance avec ce store factice
+
       const billsContainer = new Bills({
         document,
         onNavigate: () => {},
@@ -177,14 +176,14 @@ describe('Given I am connected as an employee', () => {
       // 3) on appelle getBills et on attend le résultat
       const result = await billsContainer.getBills();
 
-      // 4) on vérifie qu'on a autant d'éléments
-      expect(result).toHaveLength(rawDocs.length);
+      // 4) on vérifie qu'on a autant d'éléments que dans les fixtures
+      expect(result).toHaveLength(billsFixtures.length);
 
       // 5) et que la date/status ont été formatés
-      expect(result[0].date).toBe(formatDate(rawDocs[0].date));
-      expect(result[0].status).toBe(formatStatus(rawDocs[0].status));
-      expect(result[1].date).toBe(formatDate(rawDocs[1].date));
-      expect(result[1].status).toBe(formatStatus(rawDocs[1].status));
+      expect(result[0].date).toBe(formatDate(billsFixtures[0].date));
+      expect(result[0].status).toBe(formatStatus(billsFixtures[0].status));
+      expect(result[1].date).toBe(formatDate(billsFixtures[1].date));
+      expect(result[1].status).toBe(formatStatus(billsFixtures[1].status));
     });
     test('getBills returns raw date if formatDate throws', async () => {
       // 1) on crée un faux doc dont la date posera problème
@@ -228,4 +227,38 @@ describe('Given I am connected as an employee', () => {
       jest.restoreAllMocks();
     });
   });
+});
+
+test('fetches bills and fails with 404 message error', async () => {
+  const fakeStore = {
+    bills: () => ({
+      list: () => Promise.reject(new Error('Erreur 404')),
+    }),
+  };
+
+  const billsContainer = new Bills({
+    document,
+    onNavigate: () => {},
+    store: fakeStore,
+    localStorage: window.localStorage,
+  });
+
+  await expect(billsContainer.getBills()).rejects.toThrow('Erreur 404');
+});
+
+test('fetches bills and fails with 500 message error', async () => {
+  const fakeStore = {
+    bills: () => ({
+      list: () => Promise.reject(new Error('Erreur 500')),
+    }),
+  };
+
+  const billsContainer = new Bills({
+    document,
+    onNavigate: () => {},
+    store: fakeStore,
+    localStorage: window.localStorage,
+  });
+
+  await expect(billsContainer.getBills()).rejects.toThrow('Erreur 500');
 });
