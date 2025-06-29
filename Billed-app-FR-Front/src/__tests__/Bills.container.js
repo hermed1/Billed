@@ -8,8 +8,9 @@ import { screen, fireEvent } from '@testing-library/dom';
 import Bills from '../containers/Bills.js';
 import BillsUI from '../views/BillsUI.js';
 import { ROUTES_PATH } from '../constants/routes.js';
-import { bills as billsFixtures } from '../fixtures/bills.js';
+import { badBills, bills as billsFixtures } from '../fixtures/bills.js';
 import { formatDate, formatStatus } from '../app/format.js';
+import mockStore from '../__mocks__/store';
 
 describe('Given I am connected as an employee', () => {
   describe('When I am on Bills Page (no bills)', () => {
@@ -30,7 +31,6 @@ describe('Given I am connected as an employee', () => {
   describe('When I click on buttonNewBill', () => {
     beforeEach(() => {
       document.body.innerHTML = BillsUI({
-        //vérifier d'où sort le "document"
         data: [],
         loading: false,
         error: null,
@@ -74,33 +74,6 @@ describe('Given I am connected as an employee', () => {
       const eyeIcons = screen.getAllByTestId('icon-eye');
       expect(eyeIcons.length).toBe(billsFixtures.length);
     });
-    // test.only('Then each click on the eye icon should call the handleClickIconEye function', () => {
-    //   const eyeIcons = screen.getAllByTestId('icon-eye');
-    //   // 1. onNavigate : une fonction factice qu’on va espionner
-    //   const onNavigate = jest.fn();
-    //   // 2. store : pas nécessaire ici, on peut mettre null
-    //   const store = null;
-    //   // 3. localStorage : le vrai, fourni par jsdom
-    //   const localStorage = window.localStorage;
-    //   const billsContainer = new Bills({
-    //     document,
-    //     onNavigate,
-    //     store,
-    //     localStorage,
-    //   });
-    //   const spyHandleClickonEye = jest.spyOn(
-    //     billsContainer,
-    //     'handleClickIconEye'
-    //   );
-    //   eyeIcons.forEach((eyeIcon, index) => {
-    //     fireEvent.click(eyeIcon);
-    //     // au choix, je peux cibler par alt directement const img = document.querySelector('img[alt="Bill"]');
-    //     const img = document.querySelector('#modaleFile .modal-body img');
-    //     expect(spyHandleClickonEye).toHaveBeenCalled();
-    //     expect(img).toBeTruthy();
-    //     expect(img.getAttribute('src')).toBe(billsFixtures[index].fileUrl);
-    //   });
-    // });
     test('Then each click on the eye icon should open the modal with the correct image', () => {
       const eyeIcons = screen.getAllByTestId('icon-eye');
 
@@ -149,27 +122,18 @@ describe('Given I am connected as an employee', () => {
     test('formatStatus converts "pending" to "En attente"', () => {
       expect(formatStatus('pending')).toBe('En attente');
       expect(formatStatus('accepted')).toBe('Accepté');
-      expect(formatStatus('refused')).toBe('Refused');
+      expect(formatStatus('refused')).toBe('Refusé');
     });
   });
 
   describe('integration tests', () => {
-    //tester que quand on passe par getBills, on a bien notre date et status formatés
+    //tester que quand on passe par getBills, on a bien notre date et statut formatés
 
-    test('getBills returns bills with formatted date and status', async () => {
-        // 1) on crée un store factice qui renvoie les fixtures
-      const fakeStore = {
-        bills: () => ({
-          list: () => Promise.resolve(billsFixtures),
-        }),
-      };
-
-      // 2) on monte l'instance avec ce store factice
-
+    test('getBills returns the right number of bills with formatted date and status', async () => {
       const billsContainer = new Bills({
         document,
         onNavigate: () => {},
-        store: fakeStore,
+        store: mockStore,
         localStorage: window.localStorage,
       });
 
@@ -177,6 +141,10 @@ describe('Given I am connected as an employee', () => {
       const result = await billsContainer.getBills();
 
       // 4) on vérifie qu'on a autant d'éléments que dans les fixtures
+      //vérifier pourquoi on utilise les fixtures
+      //la comparaison est valable que si on a les mêmes données
+      // dans les fixtures et dans le mockStore
+
       expect(result).toHaveLength(billsFixtures.length);
 
       // 5) et que la date/status ont été formatés
@@ -185,80 +153,67 @@ describe('Given I am connected as an employee', () => {
       expect(result[1].date).toBe(formatDate(billsFixtures[1].date));
       expect(result[1].status).toBe(formatStatus(billsFixtures[1].status));
     });
-    test('getBills returns raw date if formatDate throws', async () => {
-      // 1) on crée un faux doc dont la date posera problème
-      const badDoc = {
-        id: 'x1',
-        date: 'INVALID',
-        status: 'refused',
-        foo: 'bar',
-      };
-      const fakeStore = {
-        bills: () => ({
-          list: () => Promise.resolve([badDoc]),
-        }),
-      };
 
-      // 2) on moque formatDate pour qu'elle jette sur ce badDoc
-      const originalFormatDate = formatDate;
+    test('getBills returns raw date if formatDate fail', async () => {
+      // 1) on crée un faux doc dont la date posera problème
+
       jest
-        .spyOn(require('../app/format.js'), 'formatDate')
-        .mockImplementation((d) => {
+        .spyOn(require('../app/format.js'), 'formatDate') // on spy sur le module format.js
+        .mockImplementation(() => {
+          // on mock la fonction formatDate (la vraie ne renvoie jamais d'erreur)
           throw new Error('bad date');
         });
+      // 2) store factice qui renvoie badBills
+      const badStore = {
+        bills: () => ({ list: () => Promise.resolve(badBills) }),
+      };
 
       // 3) on instancie
       const billsContainer = new Bills({
         document,
         onNavigate: () => {},
-        store: fakeStore,
+        store: badStore,
         localStorage: window.localStorage,
       });
 
       // 4) on appelle getBills
       const result = await billsContainer.getBills();
 
-      // 5) on vérifie qu'on a bien retombé sur la date brute
-      expect(result).toHaveLength(1);
-      expect(result[0].date).toBe(badDoc.date); // non formatée
-      expect(result[0].status).toBe(formatStatus(badDoc.status)); // status toujours formaté
+      // 5) on vérifie qu'on a bien retombé sur la date non formatée
+      expect(result[0].date).toBe(badBills[0].date); // non formatée retournée dans le catch
+      expect(result[0].status).toBe(formatStatus(badBills[0].status)); // status toujours formaté dans le catch
 
-      // 6) on restaure formatDate
+      // 6) //remet chaque fonction espionnée à son état d'origine
+      //Une fois fait plusieurs spyOn ou mockImplementation, Jest garde en mémoire ces remplacements.
+      //restoreAllMocks() remet toutes ces méthodes spyées/mocked à leur implémentation d’origine
+
       jest.restoreAllMocks();
     });
+    test('getBills rejette avec "Erreur 404"', async () => {
+      const errorStore = {
+        bills: () => ({ list: () => Promise.reject(new Error('Erreur 404')) }),
+      };
+      0;
+      const container = new Bills({
+        document,
+        onNavigate: () => {},
+        store: errorStore,
+        localStorage: window.localStorage,
+      });
+      await expect(container.getBills()).rejects.toThrow('Erreur 404');
+    });
+
+    test('getBills rejette avec "Erreur 500"', async () => {
+      const errorStore = {
+        bills: () => ({ list: () => Promise.reject(new Error('Erreur 500')) }),
+      };
+      const container = new Bills({
+        document,
+        onNavigate: () => {},
+        store: errorStore,
+        localStorage: window.localStorage,
+      });
+      await expect(container.getBills()).rejects.toThrow('Erreur 500');
+    });
   });
-});
-
-test('fetches bills and fails with 404 message error', async () => {
-  const fakeStore = {
-    bills: () => ({
-      list: () => Promise.reject(new Error('Erreur 404')),
-    }),
-  };
-
-  const billsContainer = new Bills({
-    document,
-    onNavigate: () => {},
-    store: fakeStore,
-    localStorage: window.localStorage,
-  });
-
-  await expect(billsContainer.getBills()).rejects.toThrow('Erreur 404');
-});
-
-test('fetches bills and fails with 500 message error', async () => {
-  const fakeStore = {
-    bills: () => ({
-      list: () => Promise.reject(new Error('Erreur 500')),
-    }),
-  };
-
-  const billsContainer = new Bills({
-    document,
-    onNavigate: () => {},
-    store: fakeStore,
-    localStorage: window.localStorage,
-  });
-
-  await expect(billsContainer.getBills()).rejects.toThrow('Erreur 500');
 });
