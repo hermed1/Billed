@@ -162,42 +162,28 @@ export default class {
 
   //   }
   handleShowTickets(e, bills, index) {
-    // 1) Initialisation de l’état “ouvert/fermé” par section
-    //    Si c’est le premier appel, this.opened n’existe pas : on le crée
+    // Initialisation de l’état “ouvert/fermé” par section
+    // Si c’est le premier appel, this.opened n’existe pas : on le crée
     if (!this.opened) this.opened = { 1: false, 2: false, 3: false };
 
-    // 2) On récupère l’état actuel de la section cliquée (1, 2 ou 3)
-    //    isOpen vaudra true si elle est déjà ouverte, false si elle est fermée
+    // Vérifie si la section est déjà ouverte
     const isOpen = this.opened[index];
 
     if (!isOpen) {
-      // ─── BLOC “OUVERTURE” ───────────────────────────────────────
-      // 3a) Tourne la flèche vers le bas pour indiquer l’ouverture
       $(`#arrow-icon${index}`).css({ transform: 'rotate(0deg)' });
-
-      // 3b) Injecte dans la DIV dédiée le HTML des factures filtrées
-      //      - filteredBills(bills, getStatus(index)) : tableau filtré selon le statut
-      //      - cards(...) : transformation de ce tableau en une grosse chaîne HTML
       $(`#status-bills-container${index}`).html(
         cards(filteredBills(bills, getStatus(index)))
       );
     } else {
-      // ─── BLOC “FERMETURE” ───────────────────────────────────────
-      // 4a) Tourne la flèche vers la droite pour indiquer la fermeture
       $(`#arrow-icon${index}`).css({ transform: 'rotate(90deg)' });
-
-      // 4b) Vide le contenu de la DIV pour masquer les factures
       $(`#status-bills-container${index}`).html('');
     }
-
-    // 5) On bascule l’état pour la prochaine fois : ouvert passe à fermé, et vice-versa
+    // On bascule l’état pour la prochaine fois : ouvert passe à fermé, et vice-versa
     this.opened[index] = !isOpen;
-
-    // 6) Chaque carte a besoin d’un listener “click” pour afficher le détail
-    //    On parcourt seulement les factures de cette section
+    // Attache un seul listener “click” par carte (jQuery off/on pour éviter les doublons)
     filteredBills(bills, getStatus(index)).forEach((bill) => {
       $(`#open-bill${bill.id}`)
-        .off('click') // on enlève d’abord tout ancien handler
+        .off('click')
         .on('click', (e) => this.handleEditTicket(e, bill, bills));
     });
 

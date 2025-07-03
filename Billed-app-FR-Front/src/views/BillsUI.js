@@ -46,7 +46,9 @@ export default ({ data: bills, loading, error }) => {
   } else if (error) {
     return ErrorPage(error);
   }
+  // Bills null ou undefined = tableau vide/copie du tableau
   const sortedBills = (bills ?? []).slice();
+  // valeur positive = a est après b
   sortedBills.sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return `
