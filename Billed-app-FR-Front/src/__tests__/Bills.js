@@ -24,7 +24,7 @@ import { formatDate, formatStatus } from '../app/format.js';
 
 describe('Given I am connected as an employee', () => {
   describe('When I am on Bills Page', () => {
-    test('Then bill icon in vertical layout should be highlighted', async () => {
+    test('The bill icon in vertical layout should be highlighted', async () => {
       Object.defineProperty(window, 'localStorage', {
         value: localStorageMock,
       });
@@ -76,7 +76,7 @@ describe('Given I am connected as an employee', () => {
     test('Then each click on the eye icon should open the modal with the correct image', () => {
       const eyeIcons = screen.getAllByTestId('icon-eye');
 
-      // instanciation pour binder les listeners
+      // Crée l’instance du container et attache les écouteurs d’événements
       new Bills({
         document,
         onNavigate: () => {},
@@ -85,13 +85,13 @@ describe('Given I am connected as an employee', () => {
       });
 
       eyeIcons.forEach((eyeIcon) => {
-        // 1) on lit l’URL directement depuis l’attribut de l’icône
+        // 1) on récupère l’URL directement depuis l’attribut de l’icône
         const expectedUrl = eyeIcon.getAttribute('data-bill-url');
 
         // 2) on clique
         fireEvent.click(eyeIcon);
 
-        // 3) on récupère l’image injectée
+        // 3) on récupère l’image injectée par le container
         const img = document.querySelector('#modaleFile .modal-body img');
         expect(img).toBeTruthy();
 
@@ -152,7 +152,6 @@ describe('Given I am connected as an employee', () => {
   });
   describe('integration tests', () => {
     //tester que quand on passe par getBills, on a bien notre date et statut formatés
-
     test('getBills returns the right number of bills with formatted date and status', async () => {
       const billsContainer = new Bills({
         document,
@@ -160,12 +159,10 @@ describe('Given I am connected as an employee', () => {
         store: mockStore,
         localStorage: window.localStorage,
       });
-
       // 3) on appelle getBills et on attend le résultat
       const result = await billsContainer.getBills();
 
       // 4) on vérifie qu'on a autant d'éléments que dans les fixtures
-      //vérifier pourquoi on utilise les fixtures
       //la comparaison est valable que si on a les mêmes données
       // dans les fixtures et dans le mockStore
 
@@ -180,8 +177,8 @@ describe('Given I am connected as an employee', () => {
 
     test('getBills returns raw date if formatDate fail', async () => {
       // 1) on crée un faux doc dont la date posera problème
-
       jest
+        //jest.spyOn(objetCible, 'nomDeLaMethode');
         .spyOn(require('../app/format.js'), 'formatDate') // on spy sur le module format.js
         .mockImplementation(() => {
           // on mock la fonction formatDate (la vraie ne renvoie jamais d'erreur)
@@ -199,10 +196,8 @@ describe('Given I am connected as an employee', () => {
         store: badStore,
         localStorage: window.localStorage,
       });
-
       // 4) on appelle getBills
       const result = await billsContainer.getBills();
-
       // 5) on vérifie qu'on a bien retombé sur la date non formatée
       expect(result[0].date).toBe(badBills[0].date); // non formatée retournée dans le catch
       expect(result[0].status).toBe(formatStatus(badBills[0].status)); // status toujours formaté dans le catch
@@ -210,7 +205,6 @@ describe('Given I am connected as an employee', () => {
       // 6) //remet chaque fonction espionnée à son état d'origine
       //Une fois fait plusieurs spyOn ou mockImplementation, Jest garde en mémoire ces remplacements.
       //restoreAllMocks() remet toutes ces méthodes spyées/mocked à leur implémentation d’origine
-
       jest.restoreAllMocks();
     });
   });

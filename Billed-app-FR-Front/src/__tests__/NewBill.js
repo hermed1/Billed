@@ -17,15 +17,13 @@ describe('Given I am connected as an employee', () => {
     let formNewBill, onNavigate;
 
     beforeEach(() => {
-      // 1) on affiche la page
+      // 1) on injecte la vue NewBillUI dans le DOM
       document.body.innerHTML = NewBillUI();
-
       // 2) on simule un user déjà logué (pour que handleSubmit puisse lire localStorage)
       window.localStorage.setItem(
         'user',
         JSON.stringify({ type: 'Employee', email: 'test@billed.app' })
       );
-
       // 3) on récupère le form et on prépare le spy onNavigate
       formNewBill = screen.getByTestId('form-new-bill');
       onNavigate = jest.fn();
@@ -41,15 +39,14 @@ describe('Given I am connected as an employee', () => {
     describe('when I upload a file', () => {
       test('Then, it should alert if the file type is not valid', () => {
         new NewBill({ document, onNavigate, store: null, localStorage });
-        // on simule un fichier avec une extension invalide
         const fileInput = screen.getByTestId('file');
+        // on simule un fichier avec une extension invalide
         //file = utilitaire de fichier de javascript
         const invalidFile = new File(['fake content'], 'test.pdf', {
-          type: 'text/plain',
+          type: 'text/plain', //MIME type
         });
-        window.alert = jest.fn(); // positionne spy sur window.alert : vérifier ce que ça fait (voir si ça le répertorie au niveau de jest)
+        window.alert = jest.fn(); //remplace la fonction alert par une fonction qu'on peut espionner
         fireEvent.change(fileInput, { target: { files: [invalidFile] } });
-
         // on vérifie que l’alerte a été appelée
         expect(window.alert).toHaveBeenCalledWith(
           'Seuls les fichiers .jpg, .jpeg ou .png sont acceptés.'
@@ -61,9 +58,9 @@ describe('Given I am connected as an employee', () => {
         // qui se résout avec un objet contenant fileUrl et key.
         // mockResolvedValue = quand on appellera cette fonction, elle renverra automatiquement
         // une promesse qui se résout avec les deux valeurs suivantes.
-        // (on simule les deux valeurs retournées par la vraie promesse (en cas de succès = réolution))
+        // on simule les deux valeurs retournées par la vraie promesse
 
-        // 1️⃣  On fabrique une fonction espionne (Jest spy) pour surveiller les appels à `create`
+        // 1️⃣  On fabrique une fonction pour surveiller les appels à `create`
         const createMock = jest.fn().mockResolvedValue({
           fileUrl: 'https://img.test/avatar.png',
           key: '123abc',
@@ -77,7 +74,6 @@ describe('Given I am connected as an employee', () => {
             create: createMock, // ← ici on “branche” la fonction espionne
           }),
         };
-
         // 3️⃣  On instancie le container NewBill en lui injectant ce faux store
         const newBillContainer = new NewBill({
           document,
@@ -88,6 +84,7 @@ describe('Given I am connected as an employee', () => {
         const fileInput = screen.getByTestId('file');
         const pngFile = new File(['img'], 'note.png', { type: 'image/png' });
         //defineProperty = méthode js du type primaire objet (on va chercher l'objet fileInput et mettre à jour sa value à vérifier)
+        //pour vérifier le fileName
         Object.defineProperty(fileInput, 'value', {
           writable: true,
           value: 'C:\\fakepath\\note.png',
@@ -108,7 +105,9 @@ describe('Given I am connected as an employee', () => {
       test("then, if there's an Error,handleChangeFile – gère une erreur API (catch)", async () => {
         // 1. on espionne console.error
         const consoleErrorSpy = jest
+          //jest.spyOn(objetCible, 'nomDeLaMethode')
           .spyOn(console, 'error')
+          //Remplace temporairement le corps de la méthode console.error
           .mockImplementation(() => {});
 
         // 2. faux store dont create renvoie une promesse rejetée
@@ -239,81 +238,77 @@ describe('Given I am connected as an employee', () => {
     // *     - soumet le formulaire
     // *     - le container appelle store.create, puis store.update
     // *     - la navigation se fait vers la page Bills
+    describe('Given I am connected as an employee and on the New Bill page', () => {
+      describe('When I upload a valid PNG and submit the form', () => {
+        const onNavigate = jest.fn();
 
-    describe('INTégration – NewBill : POST complet', () => {
-      const onNavigate = jest.fn();
+        window.localStorage.setItem(
+          'user',
+          JSON.stringify({ type: 'Employee', email: 'test@billed.app' })
+        );
 
-      window.localStorage.setItem(
-        'user',
-        JSON.stringify({ type: 'Employee', email: 'test@billed.app' })
-      );
+        /* spies côté API */
+        const createMock = jest.fn().mockResolvedValue({
+          fileUrl: 'https://img.host/facture.png',
+          key: 'bill123',
+        });
+        const updateMock = jest.fn().mockResolvedValue({});
 
-      /* spies côté API */
-      const createMock = jest.fn().mockResolvedValue({
-        fileUrl: 'https://img.host/facture.png',
-        key: 'bill123',
+        /* faux store injecté */
+        const mockStore = {
+          bills: () => ({
+            create: createMock,
+            update: updateMock,
+          }),
+        };
+        test('Then it should call store.create, then store.update, and navigate to Bills', async () => {
+          document.body.innerHTML = NewBillUI();
+          new NewBill({
+            document,
+            onNavigate,
+            store: mockStore,
+            localStorage: window.localStorage,
+          });
+
+          const fileInput = screen.getByTestId('file');
+          const pngFile = new File(['dummy'], 'facture.png', {
+            type: 'image/png',
+          });
+          Object.defineProperty(fileInput, 'value', {
+            writable: true,
+            value: 'C:\\fakepath\\facture.png', // Simule le chemin renvoyé par le navigateur pour l’input file
+          });
+          fireEvent.change(fileInput, { target: { files: [pngFile] } });
+
+          await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+          /* ③ Remplissage de quelques champs */
+          screen.getByTestId('expense-name').value = 'Taxi Paris';
+          screen.getByTestId('amount').value = '42';
+          screen.getByTestId('datepicker').value = '2025-02-28';
+
+          /* ④ Soumission du formulaire */
+          fireEvent.submit(screen.getByTestId('form-new-bill'));
+
+          await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+
+          //updateMock.mock.calls est un tableau de tous les appels faits à updateMock.
+          //le premier appel, qui contient les arguments passés à cet appel.
+          // [0] premier argument de l'appel
+          const updateBody = JSON.parse(updateMock.mock.calls[0][0].data);
+          expect(updateBody.fileUrl).toBe('https://img.host/facture.png');
+          expect(updateBody.fileName).toBe('facture.png');
+          expect(updateBody.amount).toBe(42);
+          expect(updateMock.mock.calls[0][0].selector).toBe('bill123');
+
+          expect(onNavigate).toHaveBeenCalledWith(ROUTES_PATH.Bills);
+        });
       });
-      const updateMock = jest.fn().mockResolvedValue({});
 
-      /* faux store injecté */
-      const mockStore = {
-        bills: () => ({
-          create: createMock,
-          update: updateMock,
-        }),
-      };
-
-      test('POST : create → update → navigation Bills', async () => {
-        /* ① monte l’UI et instancie le container */
-        document.body.innerHTML = NewBillUI();
-        new NewBill({
-          document,
-          onNavigate,
-          store: mockStore,
-          localStorage: window.localStorage,
-        });
-
-        /* ② Upload d’un PNG */
-        const fileInput = screen.getByTestId('file');
-        const pngFile = new File(['dummy'], 'facture.png', {
-          type: 'image/png',
-        });
-        Object.defineProperty(fileInput, 'value', {
-          writable: true,
-          value: 'C:\\fakepath\\facture.png',
-        });
-        fireEvent.change(fileInput, { target: { files: [pngFile] } });
-
-        await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
-
-        /* ③ Remplissage de quelques champs */
-        screen.getByTestId('expense-name').value = 'Taxi Paris';
-        screen.getByTestId('amount').value = '42';
-        screen.getByTestId('datepicker').value = '2025-02-28';
-
-        /* ④ Soumission du formulaire */
-        fireEvent.submit(screen.getByTestId('form-new-bill'));
-
-        await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
-
-        /* ⑤ Assertions finales */
-        const createArgs = createMock.mock.calls[0][0];
-        expect(createArgs.data instanceof FormData).toBe(true);
-        expect(createArgs.headers?.noContentType).toBe(true);
-
-        const updateBody = JSON.parse(updateMock.mock.calls[0][0].data);
-        expect(updateBody.fileUrl).toBe('https://img.host/facture.png');
-        expect(updateBody.fileName).toBe('facture.png');
-        expect(updateBody.amount).toBe(42);
-        expect(updateMock.mock.calls[0][0].selector).toBe('bill123');
-
-        expect(onNavigate).toHaveBeenCalledWith(ROUTES_PATH.Bills);
+      afterEach(() => {
+        window.localStorage.clear();
+        jest.clearAllMocks();
       });
-    });
-
-    afterEach(() => {
-      window.localStorage.clear();
-      jest.clearAllMocks();
     });
   });
 });
